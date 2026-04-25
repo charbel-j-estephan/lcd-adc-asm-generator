@@ -1,0 +1,474 @@
+; AUTO-GENERATED ASM - V13 LOOKUP TABLE ADC
+#INCLUDE "P16F877A.INC"
+__CONFIG _HS_OSC & _WDT_OFF & _LVP_OFF
+
+REG1 EQU 0x21
+REG2 EQU 0x22
+REG3 EQU 0x23
+ADC_L EQU 0x24
+ADC_H EQU 0x25
+BCD_0 EQU 0x26
+BCD_1 EQU 0x27
+BCD_2 EQU 0x28
+BCD_3 EQU 0x29
+ROFF EQU 0x2A
+LCTR EQU 0x2B
+TIDX EQU 0x2C
+WTMP EQU 0x2D
+ADCV_L EQU 0x2E
+ADCV_H EQU 0x2F
+SPEED_L EQU 0x30
+SPEED_H EQU 0x31
+TANK_L EQU 0x32
+TANK_H EQU 0x33
+TANKSTATUS_L EQU 0x34
+TANKSTATUS_H EQU 0x35
+
+      ORG 0x00
+CONFI
+      BSF STATUS,RP0
+      MOVLW 0xFF
+      MOVWF TRISA
+      CLRF TRISD
+      CLRF TRISE
+      MOVLW 0x8E
+      MOVWF ADCON1
+      BCF STATUS,RP0
+      CALL CONFILCD
+      CALL ADC_INIT
+
+MAIN
+      CALL READ_ADC
+      CALL UPDATE_LCD
+      CALL DEL3
+      GOTO MAIN
+
+UPDATE_LCD
+      MOVLW 0x80
+      CALL COMMAND
+      MOVLW 0x41
+      CALL CHAR
+      MOVLW 0x30
+      CALL CHAR
+      MOVLW 0x30
+      CALL CHAR
+      MOVLW 0x4C
+      CALL CHAR
+      MOVLW 0x20
+      CALL CHAR
+      MOVLW 0x20
+      CALL CHAR
+      MOVLW 0x20
+      CALL CHAR
+      MOVLW 0x20
+      CALL CHAR
+      MOVLW 0x20
+      CALL CHAR
+      MOVF TANKSTATUS_L,W
+      MOVWF REG1
+      MOVF TANKSTATUS_H,W
+      MOVWF REG2
+      CALL DISP_TANKSTATUS
+      MOVLW 0xC0
+      CALL COMMAND
+      MOVLW 0x4D
+      CALL CHAR
+      MOVLW 0x41
+      CALL CHAR
+      MOVLW 0x58
+      CALL CHAR
+      MOVLW 0x4C
+      CALL CHAR
+      MOVLW 0x45
+      CALL CHAR
+      MOVLW 0x56
+      CALL CHAR
+      MOVLW 0x45
+      CALL CHAR
+      MOVLW 0x4C
+      CALL CHAR
+      MOVLW 0x3A
+      CALL CHAR
+      MOVF TANK_L,W
+      MOVWF REG1
+      MOVF TANK_H,W
+      MOVWF REG2
+      CALL DISP_TANK
+      MOVLW 0x20
+      CALL CHAR
+      MOVLW 0x20
+      CALL CHAR
+      MOVF SPEED_L,W
+      MOVWF REG1
+      MOVF SPEED_H,W
+      MOVWF REG2
+      CALL DISP_SPEED
+      RETURN
+
+DISP_TANKSTATUS
+      MOVWF TIDX
+      CALL PT_TANKSTATUS
+      MOVWF ROFF
+      MOVLW D'7'
+      MOVWF LCTR
+LP_TANKSTATUS
+      MOVF ROFF,W
+      CALL TB_TANKSTATUS
+      CALL CHAR
+      INCF ROFF,F
+      DECFSZ LCTR,F
+      GOTO LP_TANKSTATUS
+      RETURN
+
+PT_TANKSTATUS
+      MOVF TIDX,W
+      ADDWF PCL,F
+      RETLW D'0'
+      RETLW D'7'
+      RETLW D'14'
+      RETLW D'21'
+TB_TANKSTATUS
+      ADDWF PCL,F
+      RETLW 0x45
+      RETLW 0x4D
+      RETLW 0x50
+      RETLW 0x54
+      RETLW 0x59
+      RETLW 0x20
+      RETLW 0x20
+      RETLW 0x51
+      RETLW 0x55
+      RETLW 0x41
+      RETLW 0x52
+      RETLW 0x54
+      RETLW 0x45
+      RETLW 0x52
+      RETLW 0x48
+      RETLW 0x41
+      RETLW 0x4C
+      RETLW 0x46
+      RETLW 0x20
+      RETLW 0x20
+      RETLW 0x20
+      RETLW 0x46
+      RETLW 0x55
+      RETLW 0x4C
+      RETLW 0x4C
+      RETLW 0x20
+      RETLW 0x20
+      RETLW 0x20
+DISP_TANK
+      CALL BIN16BCD
+      MOVF BCD_2,W
+      CALL SEND_DIGIT
+      MOVF BCD_1,W
+      CALL SEND_DIGIT
+      MOVF BCD_0,W
+      CALL SEND_DIGIT
+      RETURN
+
+DISP_SPEED
+      MOVWF TIDX
+      CALL PT_SPEED
+      MOVWF ROFF
+      MOVLW D'2'
+      MOVWF LCTR
+LP_SPEED
+      MOVF ROFF,W
+      CALL TB_SPEED
+      CALL CHAR
+      INCF ROFF,F
+      DECFSZ LCTR,F
+      GOTO LP_SPEED
+      RETURN
+
+PT_SPEED
+      MOVF TIDX,W
+      ADDWF PCL,F
+      RETLW D'0'
+      RETLW D'2'
+TB_SPEED
+      ADDWF PCL,F
+      RETLW 0x48
+      RETLW 0x53
+      RETLW 0x4C
+      RETLW 0x53
+; Lookup table: 9 buckets for range 0-8
+; -------------------------------------------------------
+; READ_ADC: Lookup table scaling 0-1023 -> 0-8
+; No multiplication. Pure compare-and-branch.
+; ADFM=1 (right justified), reads ADRESH:ADRESL
+; -------------------------------------------------------
+ADC_INIT
+      MOVLW 0x41
+      MOVWF ADCON0
+      RETURN
+
+READ_ADC
+      BSF ADCON0,2
+ADWT  BTFSC ADCON0,2
+      GOTO ADWT
+      MOVF ADRESH,W
+      MOVWF ADC_H
+      BSF STATUS,RP0
+      MOVF ADRESL,W
+      BCF STATUS,RP0
+      MOVWF ADC_L
+      GOTO ADLUT
+      RETURN
+
+; --- ADC Lookup Table ---
+ADLUT
+      ; --- ADC < 113 -> output 0 ---
+      MOVF ADC_H,W
+      BTFSS STATUS,Z
+      GOTO ADBIG_0
+      MOVLW 0x71
+      SUBWF ADC_L,W
+      BTFSS STATUS,C
+      GOTO SET_0
+      GOTO ADBIG_0
+SET_0
+      MOVLW LOW(D'0')
+      MOVWF ADCV_L
+      MOVLW HIGH(D'0')
+      MOVWF ADCV_H
+      RETURN
+ADBIG_0
+      ; --- ADC < 227 -> output 1 ---
+      MOVF ADC_H,W
+      BTFSS STATUS,Z
+      GOTO ADBIG_1
+      MOVLW 0xE3
+      SUBWF ADC_L,W
+      BTFSS STATUS,C
+      GOTO SET_1
+      GOTO ADBIG_1
+SET_1
+      MOVLW LOW(D'1')
+      MOVWF ADCV_L
+      MOVLW HIGH(D'1')
+      MOVWF ADCV_H
+      RETURN
+ADBIG_1
+      ; --- ADC < 341 -> output 2 ---
+      MOVLW 0x01
+      SUBWF ADC_H,W
+      BTFSC STATUS,Z
+      GOTO CHKL_2
+      BTFSS STATUS,C
+      GOTO SET_2
+      GOTO ADBIG_2
+CHKL_2
+      MOVLW 0x55
+      SUBWF ADC_L,W
+      BTFSS STATUS,C
+      GOTO SET_2
+      GOTO ADBIG_2
+SET_2
+      MOVLW LOW(D'2')
+      MOVWF ADCV_L
+      MOVLW HIGH(D'2')
+      MOVWF ADCV_H
+      RETURN
+ADBIG_2
+      ; --- ADC < 455 -> output 3 ---
+      MOVLW 0x01
+      SUBWF ADC_H,W
+      BTFSC STATUS,Z
+      GOTO CHKL_3
+      BTFSS STATUS,C
+      GOTO SET_3
+      GOTO ADBIG_3
+CHKL_3
+      MOVLW 0xC7
+      SUBWF ADC_L,W
+      BTFSS STATUS,C
+      GOTO SET_3
+      GOTO ADBIG_3
+SET_3
+      MOVLW LOW(D'3')
+      MOVWF ADCV_L
+      MOVLW HIGH(D'3')
+      MOVWF ADCV_H
+      RETURN
+ADBIG_3
+      ; --- ADC < 568 -> output 4 ---
+      MOVLW 0x02
+      SUBWF ADC_H,W
+      BTFSC STATUS,Z
+      GOTO CHKL_4
+      BTFSS STATUS,C
+      GOTO SET_4
+      GOTO ADBIG_4
+CHKL_4
+      MOVLW 0x38
+      SUBWF ADC_L,W
+      BTFSS STATUS,C
+      GOTO SET_4
+      GOTO ADBIG_4
+SET_4
+      MOVLW LOW(D'4')
+      MOVWF ADCV_L
+      MOVLW HIGH(D'4')
+      MOVWF ADCV_H
+      RETURN
+ADBIG_4
+      ; --- ADC < 682 -> output 5 ---
+      MOVLW 0x02
+      SUBWF ADC_H,W
+      BTFSC STATUS,Z
+      GOTO CHKL_5
+      BTFSS STATUS,C
+      GOTO SET_5
+      GOTO ADBIG_5
+CHKL_5
+      MOVLW 0xAA
+      SUBWF ADC_L,W
+      BTFSS STATUS,C
+      GOTO SET_5
+      GOTO ADBIG_5
+SET_5
+      MOVLW LOW(D'5')
+      MOVWF ADCV_L
+      MOVLW HIGH(D'5')
+      MOVWF ADCV_H
+      RETURN
+ADBIG_5
+      ; --- ADC < 796 -> output 6 ---
+      MOVLW 0x03
+      SUBWF ADC_H,W
+      BTFSC STATUS,Z
+      GOTO CHKL_6
+      BTFSS STATUS,C
+      GOTO SET_6
+      GOTO ADBIG_6
+CHKL_6
+      MOVLW 0x1C
+      SUBWF ADC_L,W
+      BTFSS STATUS,C
+      GOTO SET_6
+      GOTO ADBIG_6
+SET_6
+      MOVLW LOW(D'6')
+      MOVWF ADCV_L
+      MOVLW HIGH(D'6')
+      MOVWF ADCV_H
+      RETURN
+ADBIG_6
+      ; --- ADC < 910 -> output 7 ---
+      MOVLW 0x03
+      SUBWF ADC_H,W
+      BTFSC STATUS,Z
+      GOTO CHKL_7
+      BTFSS STATUS,C
+      GOTO SET_7
+      GOTO ADBIG_7
+CHKL_7
+      MOVLW 0x8E
+      SUBWF ADC_L,W
+      BTFSS STATUS,C
+      GOTO SET_7
+      GOTO ADBIG_7
+SET_7
+      MOVLW LOW(D'7')
+      MOVWF ADCV_L
+      MOVLW HIGH(D'7')
+      MOVWF ADCV_H
+      RETURN
+ADBIG_7
+      ; ADC >= 910 -> output 8
+      MOVLW LOW(D'8')
+      MOVWF ADCV_L
+      MOVLW HIGH(D'8')
+      MOVWF ADCV_H
+      RETURN
+
+BIN16BCD
+      CLRF BCD_0
+      CLRF BCD_1
+      CLRF BCD_2
+      CLRF BCD_3
+      BCF STATUS,C
+      MOVLW D'16'
+      MOVWF REG3
+B16LP
+      MOVLW BCD_0
+      MOVWF FSR
+      CALL ADJBCD
+      MOVLW BCD_1
+      MOVWF FSR
+      CALL ADJBCD
+      MOVLW BCD_2
+      MOVWF FSR
+      CALL ADJBCD
+      MOVLW BCD_3
+      MOVWF FSR
+      CALL ADJBCD
+      RLF REG1,F
+      RLF REG2,F
+      RLF BCD_0,F
+      RLF BCD_1,F
+      RLF BCD_2,F
+      RLF BCD_3,F
+      DECFSZ REG3,F
+      GOTO B16LP
+      RETURN
+
+ADJBCD MOVF INDF,W
+      ADDLW 0x03
+      MOVWF WTMP
+      BTFSC WTMP,3
+      MOVWF INDF
+      MOVF INDF,W
+      ADDLW 0x30
+      MOVWF WTMP
+      BTFSC WTMP,7
+      MOVWF INDF
+      RETURN
+
+SEND_DIGIT
+      ANDLW 0x0F
+      ADDLW 0x30
+      CALL CHAR
+      RETURN
+
+COMMAND
+      BCF PORTE,2
+      MOVWF PORTD
+      BSF PORTE,0
+      NOP
+      BCF PORTE,0
+      CALL DEL3
+      RETURN
+
+CHAR
+      BSF PORTE,2
+      MOVWF PORTD
+      BSF PORTE,0
+      NOP
+      BCF PORTE,0
+      CALL DEL3
+      RETURN
+
+CONFILCD
+      CALL DEL3
+      MOVLW 0x38
+      CALL COMMAND
+      MOVLW 0x0C
+      CALL COMMAND
+      MOVLW 0x01
+      CALL COMMAND
+      RETURN
+
+DEL3
+      MOVLW D'100'
+      MOVWF REG2
+DL1    MOVLW D'255'
+      MOVWF REG1
+DL2    DECFSZ REG1,F
+      GOTO DL2
+      DECFSZ REG2,F
+      GOTO DL1
+      RETURN
+      END
