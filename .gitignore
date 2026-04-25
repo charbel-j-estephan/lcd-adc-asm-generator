@@ -1,0 +1,22 @@
+# PyInstaller
+build/
+dist/
+
+*.spec
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+
+# Generated output
+output.asm
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VSCode
+.vscode/
